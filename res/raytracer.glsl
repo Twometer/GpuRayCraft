@@ -9,7 +9,7 @@ uniform mat4 cameraMatrix;
 uniform vec3 cameraPos;
 uniform vec3 lightPos;
 
-#define MAX_ITERATIONS 256
+#define MAX_ITERATIONS 128
 #define GROUP_SIZE 30
 #define ENABLE_SHADOWS 1
 
@@ -19,7 +19,7 @@ layout (binding = 0, rgba32f) uniform image2D destTex;
 layout (local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE) in;
 layout (std430, binding = 3) buffer voxelBuffer
 {
-    uint voxels[]; // glsl doesnt support types smaller than 32-bit
+    uint voxels[];// glsl doesnt support types smaller than 32-bit
 };
 
 vec3 calc_ray(float x, float y) {
@@ -72,7 +72,7 @@ vec4 getColor(uint x, uint y, uint z, int o) {
     else color *= 0.69;
 
     if (y < 48) {
-        color = mix(color, vec3(0,0.35,0.65), 0.85);
+        color = mix(color, vec3(0, 0.35, 0.65), 0.85);
     }
 
     return vec4(color, 1.0);
@@ -82,39 +82,44 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
     ivec3 orientation = ivec3(sign(ray.x), sign(ray.y), sign(ray.z));
     vec3 sr = vec3(abs(1/ray.x), abs(1/ray.y), abs(1/ray.z));
     vec3 f = vec3(floor(loc.x), floor(loc.y), floor(loc.z));
-    ivec3 c = ivec3(getCurrent(loc.x,f.x,orientation.x),getCurrent(loc.y,f.y,orientation.y),getCurrent(loc.z,f.z,orientation.z));
-    vec3 nr = vec3(getNextR(loc.x,f.x,orientation.x,sr.x),getNextR(loc.y,f.y,orientation.y,sr.y),getNextR(loc.z,f.z,orientation.z,sr.z));
+    ivec3 c = ivec3(getCurrent(loc.x, f.x, orientation.x), getCurrent(loc.y, f.y, orientation.y), getCurrent(loc.z, f.z, orientation.z));
+    vec3 nr = vec3(getNextR(loc.x, f.x, orientation.x, sr.x), getNextR(loc.y, f.y, orientation.y, sr.y), getNextR(loc.z, f.z, orientation.z, sr.z));
 
-    for (int i = 0; i < iterations; i++) {
-        if (nr.x < nr.y && nr.x < nr.z) // xside
+    for (;;) {
+        if (nr.x < nr.y && nr.x < nr.z)// xside
         {
+            if (nr.x > iterations) return 0;
             int hit = lookup(c.x += orientation.x, c.y, c.z);
             if (hit != 0) {
                 face = 0;
                 intersectionBlock = c;
-                intersection = nr;
+                intersection = vec3(c.x, loc.y + nr.x * ray.y, loc.z + nr.x * ray.z);
                 return hit;
             }
             nr.x += sr.x;
         }
-        else if (nr.y < nr.x && nr.y < nr.z) // yside
+        else if (nr.y < nr.x && nr.y < nr.z)// yside
         {
-            int hit = lookup(c.x, c.y += orientation.y, c.z);
+            if (nr.y > iterations) return 0;
+            c.y += orientation.y;
+            if (c.y < 0 || c.y > WORLD_SIZE_Y) return 0;
+            int hit = lookup(c.x, c.y , c.z);
             if (hit != 0) {
                 face = 1;
                 intersectionBlock = c;
-                intersection = nr;
+                intersection = vec3(loc.x + nr.y * ray.x, c.y, loc.z + nr.y * ray.z);
                 return hit;
             }
             nr.y += sr.y;
         }
         else // zside
         {
+            if (nr.z > iterations) return 0;
             int hit = lookup(c.x, c.y, c.z += orientation.z);
             if (hit != 0) {
                 face = 2;
                 intersectionBlock = c;
-                intersection = nr;
+                intersection = vec3(loc.x + nr.z * ray.x, loc.y + nr.z * ray.y, c.z);
                 return hit;
             }
             nr.z += sr.z;
@@ -134,17 +139,18 @@ void main() {
     int face;
     int block = trace(cameraPos, ray, MAX_ITERATIONS, intersectionBlock, intersection, face);
 
-    vec4 color = vec4(0.3,0.7,1.0,1);
+    vec4 color = vec4(0.3, 0.7, 1.0, 1);
     if (block != 0) {
         color = getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face);
 
 #if ENABLE_SHADOWS
         // TODO Doesnt work
-        vec3 shadowRaySrc = intersectionBlock;
+        vec3 shadowRaySrc = intersection;
         vec3 shadowRayDir = normalize(lightPos - shadowRaySrc);
         block = trace(shadowRaySrc, shadowRayDir, 64, intersectionBlock, intersection, face);
-        if (block != 0)
-            color *= 0.5;
+        if (block != 0) {
+            color *= 0.4;
+        }
 #endif
     }
 

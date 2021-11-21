@@ -93,6 +93,10 @@ void init() {
 }
 
 void camera_update() {
+    static double lastTime = glfwGetTime();
+    double deltaTime = glfwGetTime() - lastTime;
+    lastTime = glfwGetTime();
+
     double cx, cy;
     glfwGetCursorPos(window, &cx, &cy);
     glfwSetCursorPos(window, WIDTH / 2, HEIGHT / 2);
@@ -101,14 +105,14 @@ void camera_update() {
     double dy = (HEIGHT / 2) - cy;
 
 
-    cameraRot.x += dx * 0.005;
-    cameraRot.y += dy * 0.005;
+    cameraRot.x += dx * 0.1 * deltaTime;
+    cameraRot.y += dy * 0.1 * deltaTime;
 
     cameraMat = glm::mat4(glm::quat(glm::vec3(cameraRot.y, cameraRot.x, 0)));
 
-    float speed = 0.2;
+    float speed = 20.0 * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-        speed = 0.5;
+        speed = 50.0 * deltaTime;
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
         glm::vec3 vec = glm::vec3(
@@ -147,11 +151,11 @@ void camera_update() {
     }
 
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-        cameraPos.y += 0.05f;
+        cameraPos.y += speed;
     }
 
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-        cameraPos.y -= 0.05f;
+        cameraPos.y -= speed;
     }
 }
 
@@ -190,6 +194,8 @@ int main() {
         glfwDestroyWindow(window);
         return 1;
     }
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
     glfwMakeContextCurrent(window);
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
