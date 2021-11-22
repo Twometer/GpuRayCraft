@@ -46,6 +46,9 @@ void generate_world() {
                     voxel_data[idx] = 1;
                 else
                     voxel_data[idx] = 0;
+
+                if (y < SEA_LEVEL)
+                    voxel_data[idx] = 1;
             }
         }
     }

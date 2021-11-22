@@ -11,7 +11,8 @@ uniform vec3 lightPos;
 
 #define MAX_ITERATIONS 128
 #define GROUP_SIZE 30
-#define ENABLE_SHADOWS 1
+#define ENABLE_SHADOWS 0
+#define ENABLE_REFLECTIONS 1
 
 const float fov = 70.0f;
 
@@ -103,7 +104,7 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
             if (nr.y > iterations) return 0;
             c.y += orientation.y;
             if (c.y < 0 || c.y > WORLD_SIZE_Y) return 0;
-            int hit = lookup(c.x, c.y , c.z);
+            int hit = lookup(c.x, c.y, c.z);
             if (hit != 0) {
                 face = 1;
                 intersectionBlock = c;
@@ -129,6 +130,10 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
     return 0;
 }
 
+float rand(vec2 co){
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
 void main() {
     vec2 pixelPosition = gl_GlobalInvocationID.xy;
 
@@ -141,11 +146,28 @@ void main() {
 
     vec4 color = vec4(0.3, 0.7, 1.0, 1);
     if (block != 0) {
-        color = getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face);
+
+
+#if ENABLE_REFLECTIONS
+        if (intersectionBlock.y < 48) {
+            ray = reflect(ray, vec3(0, 1, 0)); // TODO use actual surface normal
+            ivec3 ib2;
+            vec3  b2;
+            block = trace(intersection + vec3(0, 1, 0), ray, 64, ib2, b2, face);
+            if (block != 0) {
+                color = mix(getColor(ib2.x, ib2.y, ib2.z, face), getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face), 0.5);
+            } else {
+                color = mix(color, getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face), 0.5);
+            }
+        } else
+#endif
+        {
+            color = getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face);
+        }
 
 #if ENABLE_SHADOWS
-        // TODO Doesnt work
-        vec3 shadowRaySrc = intersection;
+        // TODO Doesn't work very well
+        vec3 shadowRaySrc = intersection + vec3(0, 1, 0);
         vec3 shadowRayDir = normalize(lightPos - shadowRaySrc);
         block = trace(shadowRaySrc, shadowRayDir, 64, intersectionBlock, intersection, face);
         if (block != 0) {
