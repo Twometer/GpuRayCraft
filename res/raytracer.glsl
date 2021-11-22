@@ -11,10 +11,28 @@ uniform vec3 lightPos;
 
 #define MAX_ITERATIONS 128
 #define GROUP_SIZE 30
-#define ENABLE_SHADOWS 0
+#define ENABLE_SHADOWS 1
 #define ENABLE_REFLECTIONS 1
 
 const float fov = 70.0f;
+
+#define FACE_POSX 0
+#define FACE_NEGX 1
+
+#define FACE_POSY 2
+#define FACE_NEGY 3
+
+#define FACE_POSZ 4
+#define FACE_NEGZ 5
+
+const vec3 surfaceNormals[] = vec3[6](
+vec3(1, 0, 0),
+vec3(-1, 0, 0),
+vec3(0, 1, 0),
+vec3(0, -1, 0),
+vec3(0, 0, 1),
+vec3(0, 0, -1)
+);
 
 layout (binding = 0, rgba32f) uniform image2D destTex;
 layout (local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE) in;
@@ -22,6 +40,8 @@ layout (std430, binding = 3) buffer voxelBuffer
 {
     uint voxels[];// glsl doesnt support types smaller than 32-bit
 };
+
+
 
 vec3 calc_ray(float x, float y) {
     float sc = tan(radians(fov * 0.5));
@@ -68,8 +88,8 @@ int lookup(uint x, uint y, uint z) {
 vec4 getColor(uint x, uint y, uint z, int o) {
     vec3 color = vec3(0.8, 0.8, 0.8);
 
-    if (o == 0) color *= 0.77;
-    else if (o == 1) color *= 0.95;
+    if (o == 0||o==1) color *= 0.77;
+    else if (o == 2||o==3) color *= 0.95;
     else color *= 0.69;
 
     if (y < 48) {
@@ -92,7 +112,7 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
             if (nr.x > iterations) return 0;
             int hit = lookup(c.x += orientation.x, c.y, c.z);
             if (hit != 0) {
-                face = 0;
+                face = FACE_NEGX - clamp(orientation.x, 0, 1);
                 intersectionBlock = c;
                 intersection = vec3(c.x, loc.y + nr.x * ray.y, loc.z + nr.x * ray.z);
                 return hit;
@@ -106,7 +126,7 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
             if (c.y < 0 || c.y > WORLD_SIZE_Y) return 0;
             int hit = lookup(c.x, c.y, c.z);
             if (hit != 0) {
-                face = 1;
+                face = FACE_NEGY - clamp(orientation.y, 0, 1);
                 intersectionBlock = c;
                 intersection = vec3(loc.x + nr.y * ray.x, c.y, loc.z + nr.y * ray.z);
                 return hit;
@@ -118,7 +138,7 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
             if (nr.z > iterations) return 0;
             int hit = lookup(c.x, c.y, c.z += orientation.z);
             if (hit != 0) {
-                face = 2;
+                face = FACE_NEGZ - clamp(orientation.z, 0, 1);
                 intersectionBlock = c;
                 intersection = vec3(loc.x + nr.z * ray.x, loc.y + nr.z * ray.y, c.z);
                 return hit;
@@ -150,7 +170,7 @@ void main() {
 
 #if ENABLE_REFLECTIONS
         if (intersectionBlock.y < 48) {
-            ray = reflect(ray, vec3(0, 1, 0)); // TODO use actual surface normal
+            ray = reflect(ray, surfaceNormals[face]);
             ivec3 ib2;
             vec3  b2;
             block = trace(intersection + vec3(0, 1, 0), ray, 64, ib2, b2, face);
