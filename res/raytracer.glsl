@@ -7,12 +7,13 @@
 uniform vec2 screenSize;
 uniform mat4 cameraMatrix;
 uniform vec3 cameraPos;
-uniform vec3 lightPos;
+uniform vec3 lightDir;
 
 #define MAX_ITERATIONS 128
 #define GROUP_SIZE 30
 #define ENABLE_SHADOWS 1
 #define ENABLE_REFLECTIONS 1
+#define ENABLE_ATMOSPHERE 1
 
 const float fov = 70.0f;
 
@@ -188,13 +189,23 @@ void main() {
 #if ENABLE_SHADOWS
         // TODO Doesn't work very well
         vec3 shadowRaySrc = intersection + vec3(0, 1, 0);
-        vec3 shadowRayDir = normalize(lightPos - shadowRaySrc);
+        vec3 shadowRayDir = lightDir;
         block = trace(shadowRaySrc, shadowRayDir, 64, intersectionBlock, intersection, face);
-        if (block != 0) {
-            color *= 0.4;
+        if (block != 0){
+            color *=0.5;
         }
+
 #endif
     }
+#if ENABLE_ATMOSPHERE
+    else {
+        float sunlight = dot(ray, lightDir) * 0.5 + 0.5;
+        float sky = dot(ray, vec3(0,1,0)) * 0.5 + 0.5;
+
+        color = mix(color, color * 0.5, pow(sky, 4));
+        color = mix(color, vec4(1, 1, 0.92, 1), pow(sunlight, 256));
+    }
+#endif
 
     imageStore(destTex, ivec2(pixelPosition.x, pixelPosition.y), color);
 }

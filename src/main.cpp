@@ -30,7 +30,8 @@ GLFWwindow *window;
 glm::vec3 cameraPos = glm::vec3(0, 64, 0);
 glm::vec2 cameraRot = glm::vec2(-0.5, 0);
 glm::mat4 cameraMat = glm::mat4();
-glm::vec3 lightPos = glm::vec3(256, 128, 256);
+glm::vec3 lightDir = glm::vec3(0, 1, 0);
+float curTime = 0;
 
 SimplexNoise noise{};
 
@@ -93,6 +94,8 @@ void init() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 8, data, GL_STREAM_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
     glEnableVertexAttribArray(0);
+
+    lightDir = glm::vec3(0, glm::sin(curTime), glm::cos(curTime));
 }
 
 void camera_update() {
@@ -160,6 +163,15 @@ void camera_update() {
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
         cameraPos.y -= speed;
     }
+
+    if (glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS) {
+        curTime += 0.01;
+        lightDir = glm::vec3(0, glm::sin(curTime), glm::cos(curTime));
+    }
+    if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) {
+        curTime -= 0.01;
+        lightDir = glm::vec3(0, glm::sin(curTime), glm::cos(curTime));
+    }
 }
 
 void draw() {
@@ -169,7 +181,7 @@ void draw() {
     workShader->set("screenSize", glm::vec2(WIDTH, HEIGHT));
     workShader->set("cameraMatrix", cameraMat);
     workShader->set("cameraPos", cameraPos);
-    workShader->set("lightPos", lightPos);
+    workShader->set("lightDir", lightDir);
     workShader->dispatch(WIDTH / GROUP_SIZE, HEIGHT / GROUP_SIZE, 1);
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
