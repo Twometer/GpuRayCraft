@@ -9,11 +9,12 @@ uniform mat4 cameraMatrix;
 uniform vec3 cameraPos;
 uniform vec3 lightDir;
 
-#define MAX_ITERATIONS 128
+#define MAX_ITERATIONS 256
 #define GROUP_SIZE 30
 #define ENABLE_SHADOWS 1
 #define ENABLE_REFLECTIONS 1
 #define ENABLE_ATMOSPHERE 1
+#define ENABLE_FOG 1
 
 const float fov = 70.0f;
 
@@ -186,15 +187,25 @@ void main() {
             color = getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face);
         }
 
+#if ENABLE_FOG
+        float rayLen = length(intersection - cameraPos);
+        float fogginess = rayLen / MAX_ITERATIONS;
+#endif
+
 #if ENABLE_SHADOWS
         // TODO Doesn't work very well
         vec3 shadowRaySrc = intersection + vec3(0, 1, 0);
         vec3 shadowRayDir = lightDir;
         block = trace(shadowRaySrc, shadowRayDir, 64, intersectionBlock, intersection, face);
         if (block != 0){
-            color *=0.5;
+            color *= 0.5;
         }
+#endif
 
+#if ENABLE_FOG
+        float sunlight = dot(ray, lightDir) * 0.5 + 0.5;
+        color = mix(color, vec4(0.3, 0.7, 1.0, 1), clamp(fogginess, 0, 1));
+        color = mix(color, vec4(1, 1, 0.92, 1), mix(0.0, 0.5, pow(sunlight, 256) * fogginess));
 #endif
     }
 #if ENABLE_ATMOSPHERE
@@ -204,6 +215,10 @@ void main() {
 
         color = mix(color, color * 0.5, pow(sky, 4));
         color = mix(color, vec4(1, 1, 0.92, 1), pow(sunlight, 256));
+
+        /*float sunset = clamp(1 - pow(clamp(dot(vec3(0, 0, 1), lightDir), 0, 1), 32), 0, 1);
+        color.gb *= mix(0.5, 1.0, sunset);
+        color.r *=  mix(0.8, 1.0, sunset);*/
     }
 #endif
 
