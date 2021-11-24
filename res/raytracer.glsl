@@ -11,7 +11,7 @@ uniform vec3 lightDir;
 
 #define MAX_ITERATIONS 256
 #define GROUP_SIZE 30
-#define ENABLE_SHADOWS 0
+#define ENABLE_SHADOWS 1
 #define ENABLE_REFLECTIONS 1
 #define ENABLE_ATMOSPHERE 1
 #define ENABLE_FOG 1
@@ -116,9 +116,10 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
             if (nr.x > iterations) return 0;
             int hit = lookup(c.x += orientation.x, c.y, c.z);
             if (hit != 0) {
-                face = FACE_NEGX - clamp(orientation.x, 0, 1);
+                face = FACE_POSX + clamp(orientation.x, 0, 1);
                 intersectionBlock = c;
-                intersection = vec3(c.x, loc.y + nr.x * ray.y, loc.z + nr.x * ray.z);
+                float xOffset = face == FACE_NEGX ? 0 : 1;
+                intersection = vec3(c.x + xOffset, loc.y + nr.x * ray.y, loc.z + nr.x * ray.z);
                 return hit;
             }
             nr.x += sr.x;
@@ -130,9 +131,10 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
             if (c.y < 0 || c.y > WORLD_SIZE_Y) return 0;
             int hit = lookup(c.x, c.y, c.z);
             if (hit != 0) {
-                face = FACE_NEGY - clamp(orientation.y, 0, 1);
+                face = FACE_POSY + clamp(orientation.y, 0, 1);
                 intersectionBlock = c;
-                intersection = vec3(loc.x + nr.y * ray.x, c.y, loc.z + nr.y * ray.z);
+                float yOffset = face == FACE_NEGY ? 0 : 1;
+                intersection = vec3(loc.x + nr.y * ray.x, c.y + yOffset, loc.z + nr.y * ray.z);
                 return hit;
             }
             nr.y += sr.y;
@@ -142,9 +144,10 @@ int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlo
             if (nr.z > iterations) return 0;
             int hit = lookup(c.x, c.y, c.z += orientation.z);
             if (hit != 0) {
-                face = FACE_NEGZ - clamp(orientation.z, 0, 1);
+                face = FACE_POSZ + clamp(orientation.z, 0, 1);
                 intersectionBlock = c;
-                intersection = vec3(loc.x + nr.z * ray.x, loc.y + nr.z * ray.y, c.z);
+                float zOffset = face == FACE_NEGZ ? 0 : 1;
+                intersection = vec3(loc.x + nr.z * ray.x, loc.y + nr.z * ray.y, c.z + zOffset);
                 return hit;
             }
             nr.z += sr.z;
@@ -211,8 +214,7 @@ void main() {
 #endif
 
 #if ENABLE_SHADOWS
-        // TODO Doesn't work very well
-        vec3 shadowRaySrc = intersection + vec3(0, 1, 0);
+        vec3 shadowRaySrc = intersection;
         vec3 shadowRayDir = lightDir;
         block = trace(shadowRaySrc, shadowRayDir, 64, intersectionBlock, intersection, face);
         if (block != 0){
