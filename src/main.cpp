@@ -23,6 +23,7 @@ Shader *drawShader;
 Shader *workShader;
 GLuint drawTexture;
 GLuint fullscreenQuad;
+GLuint terrainTexture;
 GLuint ssbo;
 uint32_t *voxel_data;
 GLFWwindow *window;
@@ -60,13 +61,16 @@ void init() {
     drawShader = Loader::load_draw_shader("res/draw.vert", "res/draw.frag");
     workShader = Loader::load_compute_shader("res/raytracer.glsl");
 
-    // setup texture
+    // setup draw texture
     glGenTextures(1, &drawTexture);
     glBindTexture(GL_TEXTURE_2D, drawTexture);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, nullptr);
     glBindImageTexture(0, drawTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+    // load world texture
+    terrainTexture = Loader::load_texture("res/stone.png");
 
     // setup voxel world
     voxel_data = new uint32_t[WORLD_SIZE];
@@ -177,6 +181,8 @@ void camera_update() {
 void draw() {
     camera_update();
 
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, terrainTexture);
     workShader->bind();
     workShader->set("screenSize", glm::vec2(WIDTH, HEIGHT));
     workShader->set("cameraMatrix", cameraMat);
@@ -185,6 +191,9 @@ void draw() {
     workShader->dispatch(WIDTH / GROUP_SIZE, HEIGHT / GROUP_SIZE, 1);
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, drawTexture);
 
     drawShader->bind();
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

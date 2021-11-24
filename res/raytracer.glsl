@@ -11,10 +11,11 @@ uniform vec3 lightDir;
 
 #define MAX_ITERATIONS 256
 #define GROUP_SIZE 30
-#define ENABLE_SHADOWS 1
+#define ENABLE_SHADOWS 0
 #define ENABLE_REFLECTIONS 1
 #define ENABLE_ATMOSPHERE 1
 #define ENABLE_FOG 1
+#define ENABLE_AO 0
 
 const float fov = 70.0f;
 
@@ -37,6 +38,7 @@ vec3(0, 0, -1)
 );
 
 layout (binding = 0, rgba32f) uniform image2D destTex;
+layout (binding = 1) uniform sampler2D terrainTex;
 layout (local_size_x = GROUP_SIZE, local_size_y = GROUP_SIZE) in;
 layout (std430, binding = 3) buffer voxelBuffer
 {
@@ -156,6 +158,14 @@ float rand(vec2 co){
     return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
+vec3 rand3(vec2 co, float seed) {
+    return normalize(vec3(
+    rand(vec2(co.x * co.y, 29 * seed)),
+    rand(vec2(co.x * co.y, 37 * seed)),
+    rand(vec2(co.x * co.y, 47 * seed))
+    ));
+}
+
 void main() {
     vec2 pixelPosition = gl_GlobalInvocationID.xy;
 
@@ -185,6 +195,14 @@ void main() {
 #endif
         {
             color = getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face);
+
+            vec3 blockRelativeIntersection = intersection - intersectionBlock;
+            if (face == FACE_POSZ||face==FACE_NEGZ)
+            color *= texture(terrainTex, blockRelativeIntersection.xy);
+            else if (face == FACE_POSY || face==FACE_NEGY)
+            color *= texture(terrainTex, blockRelativeIntersection.xz);
+            else if (face == FACE_POSX || face==FACE_NEGX)
+            color *= texture(terrainTex, blockRelativeIntersection.zy);
         }
 
 #if ENABLE_FOG
@@ -202,6 +220,24 @@ void main() {
         }
 #endif
 
+#if ENABLE_AO
+        // TODO has the annoying tendency to crash the graphics driver
+        #define NUM_AO_SAMPLES 4
+        #define AO_RAY_LEN 1
+        int hits = 0;
+        vec3 src = intersection;
+
+        for (int a = 0; a < NUM_AO_SAMPLES; a++) {
+            block = trace(src, rand3(src.xz, src.y + a), AO_RAY_LEN, intersectionBlock, intersection, face);
+            if (block != 0) {
+                hits++;
+            }
+        }
+
+        float ao_coeff = 1 - (float(hits) / NUM_AO_SAMPLES);
+        color *= ao_coeff;
+#endif
+
 #if ENABLE_FOG
         float sunlight = dot(ray, lightDir) * 0.5 + 0.5;
         color = mix(color, vec4(0.3, 0.7, 1.0, 1), clamp(fogginess, 0, 1));
@@ -211,7 +247,7 @@ void main() {
 #if ENABLE_ATMOSPHERE
     else {
         float sunlight = dot(ray, lightDir) * 0.5 + 0.5;
-        float sky = dot(ray, vec3(0,1,0)) * 0.5 + 0.5;
+        float sky = dot(ray, vec3(0, 1, 0)) * 0.5 + 0.5;
 
         color = mix(color, color * 0.5, pow(sky, 4));
         color = mix(color, vec4(1, 1, 0.92, 1), pow(sunlight, 256));

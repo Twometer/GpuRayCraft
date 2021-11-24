@@ -8,10 +8,11 @@ add_subdirectory(lib/glfw)
 add_executable(GpuRay
         lib/glad/src/glad.c
         lib/SimplexNoise/SimplexNoise.cpp
+        lib/lodepng/lodepng.cpp
 
         src/main.cpp
         src/Loader.cpp
         src/Shader.cpp)
 
-target_include_directories(GpuRay PRIVATE lib/glm lib/glfw/include lib/glad/include lib/imgui lib/inipp/include lib/portable-file-dialogs/include lib/SimplexNoise)
+target_include_directories(GpuRay PRIVATE lib/glm lib/glfw/include lib/glad/include lib/imgui lib/inipp/include lib/portable-file-dialogs/include lib/SimplexNoise lib/lodepng)
 target_link_libraries(GpuRay glfw ${GLFW_LIBRARIES})

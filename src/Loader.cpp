@@ -5,6 +5,8 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <vector>
+#include <lodepng.h>
 #include "Loader.h"
 
 void Loader::check_shader(const std::string &name, GLuint shader) {
@@ -80,3 +82,47 @@ Shader *Loader::load_draw_shader(const std::string &vert, const std::string &fra
     return new Shader(program);
 
 }
+
+Image Loader::load_image(const std::string &path) {
+    auto image = new std::vector<uint8_t>;
+    unsigned width, height;
+     lodepng::decode(*image, width, height, path);
+    return {&image->front(), (unsigned int) image->size(), width, height};
+}
+
+GLuint Loader::load_texture(const std::string &path) {
+    Image img = load_image(path);
+
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.width, img.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img.data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    delete[] img.data;
+
+    return texture;
+}
+
+uint8_t *Loader::load_all_bytes(const std::string &path, size_t &size) {
+    std::ifstream file(path, std::ios::binary | std::ios::in);
+    file.seekg(0, std::ios::end);
+    size_t length = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    if (length == -1)
+        return nullptr;
+
+    auto *buf = new uint8_t[length];
+    file.read((char *) buf, length);
+    size = length;
+
+    file.close();
+    return buf;
+}
+
