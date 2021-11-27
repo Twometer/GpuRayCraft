@@ -104,6 +104,15 @@ vec4 getColor(uint x, uint y, uint z, int o) {
 }
 
 int trace(in vec3 loc, in vec3 ray, in int iterations, out ivec3 intersectionBlock, out vec3 intersection, out int face) {
+    ivec3 floored = ivec3(floor(loc.x), floor(loc.y), floor(loc.z));
+    int initialHit = lookup(floored.x, floored.y, floored.z);
+    if (initialHit != 0) {
+        face = FACE_POSY;
+        intersectionBlock = floored;
+        intersection = loc;
+        return initialHit;
+    }
+
     ivec3 orientation = ivec3(sign(ray.x), sign(ray.y), sign(ray.z));
     vec3 sr = vec3(abs(1/ray.x), abs(1/ray.y), abs(1/ray.z));
     vec3 f = vec3(floor(loc.x), floor(loc.y), floor(loc.z));
@@ -183,7 +192,7 @@ void main() {
     if (block != 0) {
 
 
-#if ENABLE_REFLECTIONS
+        #if ENABLE_REFLECTIONS
         if (intersectionBlock.y < 48) {
             ray = reflect(ray, surfaceNormals[face]);
             ivec3 ib2;
@@ -195,7 +204,7 @@ void main() {
                 color = mix(color, getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face), 0.5);
             }
         } else
-#endif
+        #endif
         {
             color = getColor(intersectionBlock.x, intersectionBlock.y, intersectionBlock.z, face);
 
@@ -208,24 +217,24 @@ void main() {
             color *= texture(terrainTex, blockRelativeIntersection.zy);
         }
 
-#if ENABLE_FOG
+            #if ENABLE_FOG
         float rayLen = length(intersection - cameraPos);
         float fogginess = rayLen / MAX_ITERATIONS;
-#endif
+        #endif
 
-#if ENABLE_SHADOWS
+        #if ENABLE_SHADOWS
         vec3 shadowRaySrc = intersection;
         vec3 shadowRayDir = lightDir;
         block = trace(shadowRaySrc, shadowRayDir, 64, intersectionBlock, intersection, face);
         if (block != 0){
             color *= 0.5;
         }
-#endif
+            #endif
 
-#if ENABLE_AO
-        // TODO has the annoying tendency to crash the graphics driver
-        #define NUM_AO_SAMPLES 4
-        #define AO_RAY_LEN 1
+            #if ENABLE_AO
+            // TODO has the annoying tendency to crash the graphics driver
+            #define NUM_AO_SAMPLES 4
+            #define AO_RAY_LEN 1
         int hits = 0;
         vec3 src = intersection;
 
@@ -238,15 +247,15 @@ void main() {
 
         float ao_coeff = 1 - (float(hits) / NUM_AO_SAMPLES);
         color *= ao_coeff;
-#endif
+        #endif
 
-#if ENABLE_FOG
+        #if ENABLE_FOG
         float sunlight = dot(ray, lightDir) * 0.5 + 0.5;
         color = mix(color, vec4(0.3, 0.7, 1.0, 1), clamp(fogginess, 0, 1));
         color = mix(color, vec4(1, 1, 0.92, 1), mix(0.0, 0.5, pow(sunlight, 256) * fogginess));
-#endif
+        #endif
     }
-#if ENABLE_ATMOSPHERE
+        #if ENABLE_ATMOSPHERE
     else {
         float sunlight = dot(ray, lightDir) * 0.5 + 0.5;
         float sky = dot(ray, vec3(0, 1, 0)) * 0.5 + 0.5;
@@ -258,7 +267,7 @@ void main() {
         color.gb *= mix(0.5, 1.0, sunset);
         color.r *=  mix(0.8, 1.0, sunset);*/
     }
-#endif
+        #endif
 
     imageStore(destTex, ivec2(pixelPosition.x, pixelPosition.y), color);
 }
